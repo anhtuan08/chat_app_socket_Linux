@@ -101,10 +101,9 @@ while (1) {
             break;
         }
 
-        if(strcmp(message, "list_free_user")){
-            
-        }        
-
+        if(trncmp(buffer, "~connect_to_", 12) == 0){
+            check_id()
+        }
         // Read server response
         memset(buffer, 0, BUFFER_SIZE);
         read(socket_fd, buffer, BUFFER_SIZE);

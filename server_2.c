@@ -6,16 +6,24 @@
 #define LISTEN_BACKLOG 10
 #define MAX_USER 10
 
+#define TEMP_SIZE 256
 int client_count = 0;
 int server_socket_fd;
 
-int client[MAX_USER];
+pthread_mutex_t clients_mutex;
 
 void error(const char *msg)
 {
     perror(msg);
     exit(1);
 }
+
+typedef struct{
+    int id;
+    int socket;
+} Client;
+
+Client clients[MAX_USER];
 
 typedef struct pthread_arg_t {
     int id;
@@ -30,9 +38,24 @@ void *handle_client (void *arg);
 /* Signal handler to handle SIGTERM and SIGINT signals. */
 void handler_signal(int signal);
 
-int list_free_user(const char* list);
+int find_client_socket_by_id(int id_client) {
+    pthread_mutex_lock(&clients_mutex);
+    int socket = 0;
+    for (int i = 0; i < MAX_USER; ++i) {
+        if (clients[i].id == id_client) {
+            clients[i].socket = 1;
+            socket = clients[i].socket;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+    return socket;
+}
 
-void connected_between_client(int new_socket_fd, char buffer[], int client_id);
+// Broadcast a message to a specific client
+void send_message_to_client(int client_socket, char *message) {
+    send(client_socket, message, strlen(message), 0);
+}
 
 void notify_clients_and_exit();
 
@@ -42,7 +65,7 @@ const char* list = "list_free_user";
 
 int main(int argc, char *argv[])
 {
-    int client_fd, new_socket, PORT;
+    int new_socket, PORT;
     pthread_t pthread;
 
     if (argc != 2) {
@@ -56,8 +79,6 @@ int main(int argc, char *argv[])
         printf("Invalid PORT number. Please provide a number between 1 and 65535.\n");
         return 1;
     }
-
-    add_client();
 
     struct sockaddr_in server_address, client_address;
     socklen_t client_len = sizeof(client_address);
@@ -134,9 +155,9 @@ int main(int argc, char *argv[])
 
 void* handle_client(void* argc){
     pthread_arg_t *pthread_client = (pthread_arg_t* )argc;
-    char buffer[1024] = {0};
+    char buffer[1024], temp[256];;
     int new_socket_client = pthread_client->new_socket_fd;
-    client[pthread_client->id - 1] = pthread_client->id;
+    clients[pthread_client->id].id = pthread_client->id;
     
     // Communicate with the client
     while (1) {
@@ -145,36 +166,38 @@ void* handle_client(void* argc){
         if (bytesRead <= 0) {
             printf("Client Disconnected\n");
             close(new_socket_client);
-            break;
+            // break;
         }
 
-        // if(!bcmp(buffer, "~connect_to_", 12)){
-        //     connected_between_client(new_socket_client ,buffer, client[pthread_client->id - 1]);
-        // }
+            int connected_to = 0;
+            memset(temp, 0, sizeof(temp));
+         if (strncmp(buffer, "~connect_to_", 12) == 0) {
+            int target_id = ((int)(buffer[12] - '0'));
+            connected_to = find_client_socket_by_id(target_id);
 
-        printf("Message from client with id%d: %s\n", client[pthread_client->id - 1], buffer);
+            if (connected_to) {
+                snprintf(temp, TEMP_SIZE, "Connected to Client %d.\n", target_id);
+                send_message_to_client(new_socket_client, temp);
+
+                printf("case2\n");
+            } else {
+                snprintf(temp, TEMP_SIZE, "Client %d not found.\n", target_id);
+                send_message_to_client(new_socket_client, temp);
+                printf("case3\n");
+            }
+         }
+         else {
+            snprintf(temp, TEMP_SIZE, "You are not connected to any client. Use ~connect <ID>.\n");
+            send_message_to_client(new_socket_client, temp);
+            
+        }    
+
+        printf("Message from client: %d with id%d: %s\n", clients[pthread_client->id].id, clients[pthread_client->id].id , buffer);
         
         // Echo message back to the client
         send(new_socket_client, buffer, bytesRead, 0);
     }
     return NULL;
-}
-
-void connected_between_client(int new_socket_fd, char buffer[], int client_id){
-    int to = ((int)(buffer[12] - '0')*10 + (int)(buffer[13] - '0'));
-    if (client[to] == -1) {
-    char temp[256] = "Server:user_not_exist";
-    write(new_socket_fd, temp, 255);
-    } else if (client[to] != 0) {
-    char temp[256] = "Server:user_busy";
-    write(new_socket_fd, temp, 255);
-    } else if (to == client_id) {
-    char temp[256] = "Server:connecting to self is not allowed";
-    write(new_socket_fd, temp, 255);
-    }
-    else{
-        printf("Connected betwwen client%d and client%d\n", client_id, to);
-    }
 }
 
 void handler_signal(int signal){
@@ -188,10 +211,10 @@ void handler_signal(int signal){
 void notify_clients_and_exit() {
     ///pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_USER; ++i) {
-        if (client[i] != 0) {
-            send(client[i], "Server shutting down. Goodbye!\n", 32, 0);
-            close(client[i]);
-            client[i] = 0;
+        if (clients[i].id != 0) {
+            send(clients[i].socket, "Server shutting down. Goodbye!\n", 32, 0);
+            close(clients[i].socket);
+            clients[i].id = 0;
         }
     }
     //pthread_mutex_unlock(&clients_mutex);
@@ -200,10 +223,4 @@ void notify_clients_and_exit() {
     close(server_socket_fd);
     printf("\nServer shutdown complete.\n");
     exit(0);
-}
-
-void add_client(){
-    for(int i = 0; i < MAX_USER; i++){
-        client[i] = 0;
-    }
 }
