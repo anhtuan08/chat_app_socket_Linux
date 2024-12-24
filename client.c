@@ -30,10 +30,11 @@
 int main(int argc, char *argv[]) {
     char server_name[SERVER_NAME_LEN_MAX + 1] = { 0 };
     int socket_fd;
-    struct hostent *server_host;
+    // struct hostent *server_host;
     struct sockaddr_in server_address;
-    char buffer[1024];
-    char message[1024];
+    char message[BUFFER_SIZE] = {0};
+    char buffer[SERVER_NAME_LEN_MAX] = {0};
+    char username[BUFFER_SIZE], password[BUFFER_SIZE];
 
     // /* Get server name from command line arguments or stdin. */
     if (argc > 1) {
@@ -80,14 +81,30 @@ int main(int argc, char *argv[]) {
         exit(1);
 	}
 
-while (1) {
-        // Get user input
+    // Input credentials
+    printf("Enter username: ");
+    scanf("%s", username);
+    printf("Enter password: ");
+    scanf("%s", password);
+
+    // Send credentials
+    snprintf(buffer, BUFFER_SIZE, "%s %s", username, password);
+    send(socket_fd, buffer, strlen(buffer), 0);
+
+    read(socket_fd, buffer, BUFFER_SIZE);
+    printf("%s\n", buffer);
+    if(strncmp(buffer, "Successful", 9) == 0){
+
+        while (1) {
+        // // Get user input
+        memset(buffer, 0, BUFFER_SIZE);
+
         printf("> ");
         fgets(message, BUFFER_SIZE, stdin);
 
         // Remove newline character from fgets input
         size_t len = strlen(message);
-        if (len > 0 && message[len - 1] == '\n') {
+        if (len > 0 && message[len - 1] == '\n') {  
             message[len - 1] = '\0';
         }
 
@@ -101,15 +118,14 @@ while (1) {
             break;
         }
 
-        if(trncmp(buffer, "~connect_to_", 12) == 0){
-            check_id()
-        }
-        // Read server response
-        memset(buffer, 0, BUFFER_SIZE);
         read(socket_fd, buffer, BUFFER_SIZE);
-        printf("Message from server: %s\n", buffer);
+        if(strncmp(buffer, "Connected", 8) == 0){
+            printf("Connected to another client\n: %s", buffer);
+        }
+    
     }
-
-    close(socket_fd);
-    return 0;
+    }
+    
+     close(socket_fd);
+        return 0;
 }

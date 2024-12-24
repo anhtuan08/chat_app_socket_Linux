@@ -59,9 +59,7 @@ void send_message_to_client(int client_socket, char *message) {
 
 void notify_clients_and_exit();
 
-void add_client();
-
-const char* list = "list_free_user";
+void connect_betwwen_2_client(int source, int target);
 
 int main(int argc, char *argv[])
 {
@@ -166,7 +164,7 @@ void* handle_client(void* argc){
         if (bytesRead <= 0) {
             printf("Client Disconnected\n");
             close(new_socket_client);
-            // break;
+            break;
         }
 
             int connected_to = 0;
@@ -178,6 +176,7 @@ void* handle_client(void* argc){
             if (connected_to) {
                 snprintf(temp, TEMP_SIZE, "Connected to Client %d.\n", target_id);
                 send_message_to_client(new_socket_client, temp);
+                connect_betwwen_2_client(clients[pthread_arg_t->id].id, target_id);
 
                 printf("case2\n");
             } else {
@@ -186,11 +185,6 @@ void* handle_client(void* argc){
                 printf("case3\n");
             }
          }
-         else {
-            snprintf(temp, TEMP_SIZE, "You are not connected to any client. Use ~connect <ID>.\n");
-            send_message_to_client(new_socket_client, temp);
-            
-        }    
 
         printf("Message from client: %d with id%d: %s\n", clients[pthread_client->id].id, clients[pthread_client->id].id , buffer);
         
@@ -205,6 +199,11 @@ void handler_signal(int signal){
         printf("\nSIGINT received. Shutting down the server...\n");
         notify_clients_and_exit();
     }
+}
+
+void connect_betwwen_2_client(int source, int target){
+    pritnf("Seasions betwwen two clients %d with %dd\n", source,);
+
 }
 
 // Notify all clients and close their connections
